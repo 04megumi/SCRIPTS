@@ -1,0 +1,10 @@
+SCRIPTS:
+  util:
+    - test.py
+    - IsLegalTree.py
+    - tests: null
+  dic:
+    - test.py
+    - tests: null
+  README.md: null
+  dev.md: null

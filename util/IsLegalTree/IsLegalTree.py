@@ -37,8 +37,11 @@
 #     #   dev.md: null
 #     # 返回值：True
 ##
-# TODO:
-#     - 测试   
+# TODO: 测试
+#     - 1: 正确打开文件 -> 打印内容
+#     - 2: 文件不存在 -> 报错 TODO
+#     - 3: 正确测试用例 -> True TODO
+#     TODO
 #######################
 
 import yaml
@@ -49,8 +52,7 @@ def IsLegalTree(path: str) -> bool:
     检查给定路径下的 YAML 文件内容是否符合合法的树形结构格式。
     
     :param path: 需要检查的文件路径，文件内容应该是符合树形结构描述规范的 YAML 文件。
-    :return: 如果文件内容符合合法的树形结构，返回 True；否则返回 False。
-
+    :return: 如果文件内容符合合法的树形结构，返回 True; 否则返回 False。
     :raises FileNotFoundError: 如果文件路径无效或文件不可访问时抛出异常。
     :raises ValueError: 如果 YAML 文件的内容不符合树形结构规则时抛出异常。
     """
@@ -60,10 +62,17 @@ def IsLegalTree(path: str) -> bool:
 
     try:
         with open(path, 'r') as file:
-            # 打开并读取 YAML 文件
             content = yaml.safe_load(file)
-
-            # print(content)
+        
+        # 检查是否是合法的树形结构
+        if not isinstance(content, dict):  # 树形结构的根应该是字典
+            print(f"Root element must be a dictionary. Found: {type(content)}")
+            return False
+        
+        # 校验树形结构是否合法
+        if not is_valid_tree(content):
+            print("The YAML file does not conform to a valid tree structure.")
+            return False
 
     except FileNotFoundError:
         print(f"File not Found: {path}")
@@ -71,5 +80,28 @@ def IsLegalTree(path: str) -> bool:
     except yaml.YAMLError as e:
         print(f"Error parsing YAML file: {e}")
         return False
+    
+    return True
 
 
+def is_valid_tree(node: dict) -> bool:
+    """
+    递归检查树形结构是否合法。
+    
+    :param node: 当前节点（字典类型）
+    :return: 如果当前节点和所有子节点符合树形结构，返回 True，否则返回 False。
+    """
+    if not isinstance(node, dict):
+        # 如果节点不是字典，则不符合树形结构
+        return False
+    
+    for key, value in node.items():
+        if isinstance(value, dict):
+            # 如果值是字典，继续递归检查
+            if not is_valid_tree(value):
+                return False
+        elif value is not None:
+            # 如果值既不是字典也不是空，说明不是有效的树形结构
+            return False
+        
+    return True
