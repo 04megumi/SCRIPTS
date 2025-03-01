@@ -1,0 +1,1491 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% --------------------------------------------------------
+% Tau
+% LaTeX Template
+% Version 2.4.3 (01/09/2024)
+%
+% Author: 
+% Guillermo Jimenez (memo.notess1@gmail.com)
+% 
+% License:
+% Creative Commons CC BY 4.0
+% --------------------------------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[9pt,a4paper,twoside]{tau-class/tau}
+\usepackage[english]{babel}
+\usepackage{listings}
+\usepackage{xcolor}
+
+%% Spanish babel recomendation
+% \usepackage[spanish,es-nodecimaldot,es-noindentfirst]{babel} 
+
+%----------------------------------------------------------
+% TITLE
+%----------------------------------------------------------
+
+\journalname{TRD: Spring Cloud}
+\title{A Practical Implementation of Spring Cloud for Database-to-Service Layer Integration}
+
+%----------------------------------------------------------
+% AUTHORS, AFFILIATIONS AND PROFESSOR
+%----------------------------------------------------------
+
+\author[a,1]{SeraphimWei}
+
+%----------------------------------------------------------
+
+\affil[a]{The School of Computer Science and Engineering, University of Electronic Science and Technology of China}
+\affil[b]{Tencent Inc.}
+
+%----------------------------------------------------------
+% FOOTER INFORMATION
+%----------------------------------------------------------
+
+\institution{University of Electronic Science and Technology of China}
+\footinfo{Spring Cloud Technology Overview}
+\theday{February 28, 2025}
+\leadauthor{SeraphimWei}
+\course{Creative Commons CC BY 4.0}
+
+%----------------------------------------------------------
+% ABSTRACT AND KEYWORDS
+%----------------------------------------------------------
+
+\begin{abstract}
+    This paper presents a practical implementation of Spring Cloud, focusing on the development of a simple Role-Based Access Control (RBAC) system. The process begins with the design of the database schema, followed by the creation of entity classes, mappers, repositories, and services. Each phase is carefully explained, providing a detailed guide for building and integrating these components within a Spring Cloud environment. The aim of this paper is to offer a step-by-step approach for implementing an RBAC-based permission system, which is essential for managing user access in modern cloud-based applications. This work will provide valuable insights for developers looking to understand the full stack of Spring Cloud development, from database design to service layer implementation.
+\end{abstract}
+
+%----------------------------------------------------------
+
+\keywords{Spring Cloud, RBAC, database design, entity classes, mappers, repositories, services, cloud-based applications, permission system}
+
+%----------------------------------------------------------
+
+\begin{document}
+		
+    \maketitle 
+    \thispagestyle{firststyle} \tauabstract 
+    \tableofcontents
+    \linenumbers 
+    
+%----------------------------------------------------------
+
+\section{Introduction}
+
+    \subsection{RBAC (Role-Based Access Control)}
+    Role-Based Access Control (RBAC) is a widely used access control mechanism that assigns permissions to users based on their roles within an organization. In an RBAC system, a role is a collection of permissions, and users are assigned to one or more roles. This approach simplifies the management of user permissions by grouping them according to job responsibilities, thereby enhancing security and reducing the risk of unauthorized access.
+
+    \subsection{Basic Logic}
+    The basic logic of RBAC involves defining roles, assigning permissions to these roles, and then associating users with specific roles. Each role has a predefined set of permissions, which may include read, write, or execute access to various resources. By using this system, organizations can enforce least privilege access control, ensuring that users only have access to the resources necessary for their job functions. This structure makes the system both flexible and scalable, suitable for cloud-based applications and large enterprise systems.
+
+    \subsection{Implementation in Spring Cloud}
+
+    To implement Role-Based Access Control (RBAC) in a Spring Cloud environment, we follow a series of well-defined steps:
+
+    \begin{itemize}
+        \item \textbf{Database Configuration with YAML}: The first step is to configure the database in the \texttt{bootstrap.yml} file, where connection details, such as the database URL, username, and password, are specified for Spring Cloud to interact with the database. Additionally, Flyway is used for database version management, allowing smooth and consistent database migrations. Flyway ensures that database schema changes are properly versioned and applied in the correct order during application startup.
+        
+        \item \textbf{Migration Files and Initialization}: Create a folder named \texttt{migration} and include an \texttt{init.sql} file that defines the SQL scripts to initialize the database. This file will set up the necessary tables, relationships, and initial data for the RBAC system.
+        
+        \item \textbf{Entity Classes with MyBatis-Plus}: Use MyBatis-Plus to simplify the creation of entity classes that map directly to the database tables. These classes will represent the core data structures of the RBAC system, such as users, roles, and permissions.
+        
+        \item \textbf{Designing Mapper Interfaces}: Create the corresponding mapper interfaces for the entity classes. These interfaces will define the necessary queries and data operations, with more complex logic implemented directly using SQL when needed.
+        
+        \item \textbf{Repository Layer}: Design a repository layer that interacts with the mapper to provide a higher level of abstraction and simplify data access operations. This layer helps in centralizing data-related logic.
+        
+        \item \textbf{Service Interfaces and Implementations}: Define the service interface and implement the corresponding service methods. These methods are responsible for loading user roles and permissions based on usernames. Unit tests should be created to ensure the service layer works as expected.
+        
+        \item \textbf{VO Classes and Converters}: Implement the necessary Value Object (VO) classes to transfer data between layers. Additionally, create converters to convert between entities and VO objects.
+        
+        \item \textbf{Introduce Policies}: Lastly, introduce policies that define business rules and permissions. These policies will determine what actions users can perform based on their roles and access rights, ensuring security and proper access control within the application.
+    \end{itemize}
+
+
+\section{Database Configuration with YAML}
+
+    This section explains how to configure the database connection in Spring Cloud using the \texttt{bootstrap.yml} file. In this file, connection details, such as the database URL, username, and password, are specified, allowing Spring Cloud to interact with the database. Additionally, Flyway is used for database version management, enabling smooth and consistent database migrations.
+
+    You can configure Flyway within the \texttt{bootstrap.yml} file like this:
+
+    \lstdefinelanguage{yaml}{
+      keywords={true,false,null,y,n,yes,no,on,off},
+      keywordstyle=\color{blue},
+      sensitive=false,
+      comment=[l]{\#},
+      commentstyle=\color{gray},
+      morestring=[b]',
+      morestring=[b]"}
+
+    
+\begin{lstlisting}[caption=Database and Flyway configuration with Spring Boot, language=yaml, label=dbconfig]
+spring:
+  datasource:
+    username: ${MYSQL_USER:xxx}
+    password: ${MYSQL_PWD:xxx}
+    url: jdbc:mysql://${MYSQL_HOST:ma-mysql}:${MYSQL_PORT:3306}/${MYSQL_DB:xxxx}?characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=GMT%2B8&allowMultiQueries=true
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    type: com.alibaba.druid.pool.DruidDataSource
+  flyway:
+    enabled: true
+    clean-disabled: true
+    locations: classpath:migration
+    table: flyway_schema_history
+    baseline-on-migrate: true
+    baseline-version: 1
+    encoding: UTF-8
+    out-of-order: false
+    validate-on-migrate: false
+\end{lstlisting}
+    
+    This configuration enables Flyway for automatic database schema migration during application startup, ensuring that the necessary database tables and changes are applied in the correct order.
+    
+    If you need to specify database properties for different environments, you can define them in the \texttt{bootstrap-dev.yml} or \texttt{bootstrap-prod.yml} files and Spring will load the appropriate configuration based on the active profile.
+    
+    The Flyway migration scripts should be placed in the \texttt{main/resources/migration} directory, with filenames such as \texttt{V1\_\_init.sql}, \texttt{V2\_\_add\_permissions.sql}, etc. These scripts will be executed sequentially to set up the database schema.
+    
+    The Flyway configuration ensures that your database schema changes are properly versioned and applied automatically as part of the application lifecycle.
+
+
+\section{Migration Files and Initialization}
+
+In this section, we will discuss the initialization of the database schema and the SQL migration files used to set up the necessary tables. This process ensures that the database is correctly structured and populated for the application.
+
+\subsection{SQL Code for Initialization in Migration}
+
+The initialization of the database schema is done via the `init.sql` file, which is responsible for creating the necessary tables and defining their relationships. Below is the implementation:
+
+\begin{lstlisting}[caption=SQL Initialization Script (resources/migration/Vxxx\_init\_tables.sql), language=sql, label=init_sql]
+SET NAMES utf8mb4;
+
+-- ----------------------------
+-- Table structure of usr_users
+-- ----------------------------
+DROP TABLE IF EXISTS `usr_users`;
+CREATE TABLE `usr_users`
+(
+    `id`          INT         NOT NULL,
+    `name`        VARCHAR(32) NOT NULL,
+    `name_en`     VARCHAR(64) NOT NULL,
+    `is_frozen`   TINYINT     DEFAULT '0',
+    `frozen_at`   DATETIME    DEFAULT NULL,
+    `status_id`   INT         DEFAULT NULL,
+    `status_name` VARCHAR(32) DEFAULT NULL,
+    `is_deleted`  TINYINT     DEFAULT '0',
+    `create_by`   INT         DEFAULT NULL,
+    `update_by`   INT         DEFAULT NULL,
+    `create_time` DATETIME    NOT NULL 
+    DEFAULT CURRENT_TIMESTAMP,
+    `update_time` DATETIME    NOT NULL 
+    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`) USING BTREE,
+    UNIQUE KEY `name_en` (`name_en`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_general_ci 
+  COMMENT='Backend Service - User Table';
+
+-- ----------------------------
+-- Table structure of usr_roles
+-- ----------------------------
+DROP TABLE IF EXISTS `usr_roles`;
+CREATE TABLE `usr_roles`
+(
+    `id`           CHAR(32)     NOT NULL,
+    `name`         VARCHAR(255) NOT NULL,
+    `description`  TEXT,
+    `create_by`    INT(11)      DEFAULT NULL,
+    `update_by`    INT(11)      DEFAULT NULL,
+    `create_time`  DATETIME     NOT NULL 
+    DEFAULT CURRENT_TIMESTAMP,
+    `update_time`  DATETIME     NOT NULL 
+    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `is_deleted`   TINYINT      DEFAULT 0,
+    PRIMARY KEY (`id`) USING BTREE
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_general_ci 
+  COMMENT='Backend Service - Role Table';
+
+-- ----------------------------------
+-- Table structure of usr_permissions
+-- ----------------------------------
+DROP TABLE IF EXISTS `usr_permissions`;
+CREATE TABLE `usr_permissions`
+(
+    `id`           VARCHAR(64)  NOT NULL,
+    `name`         VARCHAR(255) NOT NULL,
+    `full_name`    VARCHAR(255) NOT NULL,
+    `description`  TEXT,
+    `create_by`    INT(11)      DEFAULT NULL,
+    `update_by`    INT(11)      DEFAULT NULL,
+    `create_time`  DATETIME     NOT NULL 
+    DEFAULT CURRENT_TIMESTAMP,
+    `update_time`  DATETIME     NOT NULL 
+    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `is_deleted`   TINYINT      DEFAULT 0,
+    PRIMARY KEY (`id`) USING BTREE
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_general_ci 
+  COMMENT='Backend Service - Permission Table';
+
+-- ----------------------------
+-- Table structure of usr_user_role
+-- ----------------------------
+DROP TABLE IF EXISTS `usr_user_role`;
+CREATE TABLE `usr_user_role`
+(
+    `id`           INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+    `user_id`      INT           NOT NULL,
+    `role_id`      CHAR(32)      NOT NULL,
+    `create_by`    INT(11)       DEFAULT NULL,
+    `update_by`    INT(11)       DEFAULT NULL,
+    `create_time`  DATETIME      NOT NULL 
+    DEFAULT CURRENT_TIMESTAMP,
+    `update_time`  DATETIME      NOT NULL 
+    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `is_deleted`   TINYINT       DEFAULT 0,
+    PRIMARY KEY (`id`) USING BTREE,
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_role_id` (`role_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_general_ci 
+  COMMENT='Backend Service - User Role Association Table';
+
+-- ----------------------------
+-- Table structure of usr_role_permission
+-- ----------------------------
+DROP TABLE IF EXISTS `usr_role_permission`;
+CREATE TABLE `usr_role_permission`
+(
+    `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `role_id`      CHAR(32)     NOT NULL,
+    `permission_id`VARCHAR(64)  NOT NULL,
+    `create_by`    INT(11)      DEFAULT NULL,
+    `update_by`    INT(11)      DEFAULT NULL,
+    `create_time`  DATETIME     NOT NULL 
+    DEFAULT CURRENT_TIMESTAMP,
+    `update_time`  DATETIME     NOT NULL 
+    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `is_deleted`   TINYINT      DEFAULT 0,
+    PRIMARY KEY (`id`) USING BTREE,
+    KEY `idx_role_id` (`role_id`),
+    KEY `idx_permission_id` (`permission_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_general_ci 
+  COMMENT='Backend Service - Role Permission Table';
+
+\end{lstlisting}    
+    
+\section{Entity Classes with MyBatis-Plus}
+
+In this section, we will explore how to create Java entity classes using MyBatis-Plus. These entity classes serve as the foundation for CRUD operations and act as a mapping between the database and Java objects.
+
+\begin{tauenv}[frametitle=Introduction to MyBatis-Plus]
+    MyBatis-Plus is a powerful enhancement tool for MyBatis, designed to simplify database operations and reduce boilerplate code. It provides features like auto-generation of CRUD methods, pagination, and automatic mapping between database tables and Java objects, making it easier to perform common database tasks with minimal configuration. MyBatis-Plus helps developers focus more on business logic and less on repetitive database operations.
+
+    For more details, you can visit the official documentation at:
+    \href{https://baomidou.com/?utm_source=chatgpt.com}{MyBatis-Plus Official Documentation}
+    or check out the source code on GitHub at:
+    \href{https://github.com/baomidou/mybatis-plus?utm_source=chatgpt.com}{MyBatis-Plus GitHub Repository}.
+    \textit{Note: You can click on the above links to navigate directly to the official documentation or GitHub repository.}
+\end{tauenv}
+
+\subsection{Creating Entity Classes with MyBatis-Plus}
+
+MyBatis-Plus provides a simple and efficient way to create Entity classes for mapping database tables to Java objects. In this section, we will cover some key points and features when creating Entity classes using MyBatis-Plus, including primary key management, the use of `exists=null`, and other essential annotations and configurations.
+To create an Entity class, define a Java class where the fields represent the columns in the database table. MyBatis-Plus will automatically map the class fields to the corresponding table columns. In addition, we can use Lombok annotations like \texttt{@Data} and \texttt{@EqualsAndHashCode} to simplify the code by generating common methods like getters, setters, \texttt{toString()}, \texttt{equals()}, and \texttt{hashCode()}.
+
+Here is an example of an Entity class with Lombok annotations:
+
+\begin{lstlisting}[caption=Entity Class with Lombok Annotations, language=java]
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableField;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import java.time.LocalDateTime;
+
+@Data
+@EqualsAndHashCode(callSuper = true)
+@TableName("usr_users")
+public class User {
+
+    @TableId(type = IdType.INPUT)
+    private Integer id;
+
+    @TableField(value = "name")
+    private String name;
+
+    @TableField(exist = false)
+    private List<Role> roles;
+
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createTime;
+
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updateTime;
+    
+    // The getters, setters, equals, hashCode, and toString methods will be generated automatically by Lombok
+}
+\end{lstlisting}
+
+\begin{itemize}
+    \item \texttt{@Data} (Lombok annotation): This annotation automatically generates getters and setters for all fields, as well as \texttt{toString()}, \texttt{equals()}, and \texttt{hashCode()} methods.
+    \item \texttt{@EqualsAndHashCode} (Lombok annotation): This annotation generates \texttt{equals()} and \texttt{hashCode()} methods based on the fields in the class. The \texttt{callSuper = true} argument ensures that the super class’s \texttt{equals()} and \texttt{hashCode()} methods are also called if the class extends another class.
+    \item \texttt{@TableName} (MyBatis-Plus annotation): Specifies the corresponding table name in the database for the entity class.
+    \item \texttt{@TableId} (MyBatis-Plus annotation): Marks the primary key of the table and specifies how it should be handled, such as using the \texttt{IdType.INPUT} strategy.
+    \item \texttt{@TableField} (MyBatis-Plus annotation): Maps the class fields to the database columns. It also supports options like \texttt{exist = false} to exclude a field from being mapped to a column, and \texttt{fill} to auto-fill fields during specific operations.
+\end{itemize}
+
+Next, we will introduce the specific implementation methods in this RBAC practice.
+
+
+
+\subsection{The specific implementation in this RBAC practice}
+
+In this subsection, we will discuss the specific implementation approach for RBAC in this case. It’s important to note that in the RBAC model, the user table does not directly contain fields for roles and permissions. However, in the User entity class, we need to implement corresponding methods to retrieve the user’s roles and permissions. To achieve this, we will design business logic within the entity class to handle these relationships and dynamically fetch the appropriate data. This approach ensures that the user’s roles and permissions are properly managed and accessible in the application.
+
+\subsubsection{BaseModel Class Implementation}
+
+In this subsection, we will introduce the \texttt{BaseModel} class, which is designed to encapsulate common fields and methods for all entity classes in the application. The \texttt{BaseModel} class extends MyBatis-Plus's \texttt{Model} class and includes common fields such as \texttt{createTime}, \texttt{updateTime}, and other properties that are shared across multiple entities. By using this base class, we ensure that the common logic is centralized and can be easily reused by other entities.
+
+Here’s the implementation of the \texttt{BaseModel} class:
+
+\begin{lstlisting}[caption=BaseModel Class Implementation, language=java]
+package xxx.common.data.mybatis;
+
+import *;
+
+@Data
+@EqualsAndHashCode(callSuper = true)
+public class BaseModel<T extends BaseModel<?>> extends Model<T> {
+
+    private static final long serialVersionUID = 1L;
+
+    @TableLogic
+    @TableField(value = "is_deleted")
+    protected Integer isDeleted;
+
+    @TableField(value = "create_time", fill = FieldFill.INSERT)
+    protected LocalDateTime createTime;
+
+    @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)
+    protected LocalDateTime updateTime;
+
+    @TableField(value = "create_by", fill = FieldFill.INSERT)
+    protected Integer createBy;
+
+    @TableField(value = "update_by", fill = FieldFill.INSERT_UPDATE)
+    protected Integer updateBy;
+
+    public boolean isDeleted() {
+        return ObjectUtil.isNotNull(isDeleted) && isDeleted.equals(1);
+    }
+
+    public boolean isActive() {
+        return ObjectUtil.isNull(isDeleted) || isDeleted.equals(0);
+    }
+}
+\end{lstlisting}
+
+By inheriting from the \texttt{BaseModel}, all entities can automatically have the \texttt{createTime} and \texttt{updateTime} fields and handle their logic in a centralized manner.
+
+\begin{itemize}
+    \item \texttt{BaseModel<T extends BaseModel<?>>} is a generic class that extends \texttt{Model<T>}. The \texttt{T extends BaseModel<?>} ensures that the class can be used with specific types of \texttt{BaseModel} subclasses and provides type safety.
+    \item The \texttt{@TableLogic} annotation is used for logical deletion in MyBatis-Plus. The field \texttt{isDeleted} indicates whether a record is marked as deleted (1) or not (0).
+    \item The \texttt{@TableField} annotation is used to map class fields to database table columns. The \texttt{fill = FieldFill.INSERT} option ensures that the field is automatically filled during the insert operation, and \texttt{INSERT\_UPDATE} ensures it is filled during both insert and update operations.
+    \item \texttt{createTime} and \texttt{updateTime} are automatically handled by MyBatis-Plus during database operations for insert and update operations respectively.
+    \item \texttt{isDeleted()} and \texttt{isActive()} are custom methods used to check the deletion status of a record and whether the record is active (not deleted).
+\end{itemize}
+
+
+
+
+
+\subsubsection{Model Class in MyBatis-Plus Source Code}
+
+In this subsection, we will introduce the \texttt{Model} class in MyBatis-Plus. The \texttt{Model} class is a fundamental part of MyBatis-Plus and provides a range of essential features for CRUD (Create, Read, Update, Delete) operations. It is the base class for all entity classes and provides built-in methods that significantly reduce the amount of boilerplate code for interacting with the database.
+
+Here is an example of the source code of the \texttt{Model} class (simplified for clarity):
+
+\begin{lstlisting}[caption=Model Class (Simplified Version), language=java]
+package com.baomidou.mybatisplus.extension.activerecord;
+
+import *;
+
+public class Model<T> {
+
+    public boolean insertOrUpdate() {
+        if (this.getId() == null) {
+            return this.insert();
+        } else {
+            return this.updateById();
+        }
+    }
+
+    public boolean insert() {
+        // Implementation of insert operation
+    }
+
+    public boolean updateById() {
+        // Implementation of update operation
+    }
+
+    public boolean deleteById(Object id) {
+        // Implementation of delete operation
+    }
+
+    public T selectById(Object id) {
+        // Implementation of select operation
+    }
+
+    public List<T> selectList(Wrapper<T> wrapper) {
+        // Implementation of selectList operation
+    }
+
+    public String tableName() {
+        // Returns the table name
+    }
+
+    // Get the primary key of the entity
+    @TableId
+    public Object getId() {
+        return this.id;
+    }
+}
+\end{lstlisting}
+
+
+
+\subsubsection{User Class Implementation}
+
+In this subsection, we will discuss the implementation of the \texttt{User} class, focusing on the logic behind the \texttt{getRoleIds} and \texttt{getPermissionIds} methods.
+
+\begin{lstlisting}[caption=User Class Implementation, language=java]
+package *.api.entity;
+
+import *;
+
+@Data
+@TableName("usr_users")
+@EqualsAndHashCode(callSuper = true)
+public class User extends BaseModel<User> implements xxUserDetails {
+
+    private static final long serialVersionUID = *;
+
+    @TableId(type = IdType.INPUT)
+    private Integer id;
+
+    @TableField(value = "name")
+    private String name;
+
+    @TableField(value = "name_en")
+    private String nameEn;
+
+    @TableField(value = "is_frozen")
+    private Integer isFrozen;
+
+    @TableField(value = "frozen_at")
+    private LocalDateTime frozenAt;
+
+    @TableField(value = "status_id")
+    private Integer statusId;
+
+    @TableField(exist = false)
+    private List<Role> roles;
+
+    @TableField(exist = false)
+    private List<UserRole> userRoles;
+
+    @Override
+    public Integer getId() {
+        return id;
+    }
+
+    @Override
+    public String getUsername() {
+        return name;
+    }
+
+    @Override
+    public String getUserNameEn() {
+        return nameEn;
+    }
+
+    @Override
+    public List<String> getPermissionIds() {
+        if (CollUtil.isEmpty(roles)) {
+            return new ArrayList<>();
+        }
+        return roles.stream().map(Role::getRolePermissions).filter(Objects::nonNull)
+                .flatMap(x -> x.stream().map(RolePermission::getPermissionId).filter(Objects::nonNull))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<String> getRoleIds() {
+        if (CollUtil.isEmpty(roles)) {
+            return new ArrayList<>();
+        }
+        return roles.stream().map(Role::getId).filter(Objects::nonNull).collect(Collectors.toList());
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return null;
+    }
+
+    @Override
+    public String getPassword() {
+        return null;
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return this.isFrozen != 1;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return this.isFrozen != 1;
+    }
+}
+\end{lstlisting}
+
+\begin{itemize}
+    \item \textbf{Using interfaces for method consistency}: By implementing the \texttt{xxUserDetails} interface, the \texttt{User} class guarantees that it provides the essential methods defined in the interface. This approach helps to decouple the implementation from the service layer, allowing the service layer to rely on the interface rather than the concrete class. This leads to better flexibility and reduces direct exposure to implementation details, promoting a clean architecture. The interface contract ensures that any class implementing it will offer a consistent API, simplifying testing and maintenance.
+    
+    \item \textbf{Using Java Streams for functional data processing}: The use of Java Streams provides a more concise and declarative way to process collections of data. In the \texttt{getRoleIds} and \texttt{getPermissionIds} methods, Streams are used to transform, filter, and collect data in a clean and functional style. This approach not only improves the readability of the code but also enhances its maintainability. Streams allow for performing operations like mapping, filtering, and flattening in a compact, chained manner, avoiding the need for cumbersome loops or conditionals.
+
+    \item \textbf{Java Streams Syntax and Benefits}:
+    \begin{itemize}
+        \item \texttt{roles.stream()}: This converts the \texttt{roles} list into a \texttt{Stream}, enabling you to perform a sequence of operations on the list, such as transforming, filtering, or reducing elements.
+        \item \texttt{map(Role::getRolePermissions)}: The \texttt{map} function applies a given function to each element in the stream. In this case, it transforms each \texttt{Role} object into its corresponding \texttt{RolePermissions}. The result is a stream of \texttt{RolePermission} objects.
+        \item \texttt{filter(Objects::nonNull)}: The \texttt{filter} operation removes any \texttt{null} values from the stream, ensuring that subsequent operations can safely operate on non-null data. This operation improves the robustness of the code by avoiding potential \texttt{NullPointerExceptions}.
+        \item \texttt{flatMap(x -> x.stream())}: \texttt{flatMap} is used to flatten a stream of collections (in this case, a list of permissions) into a single stream. It allows multiple streams to be combined into one, simplifying the structure of nested collections.
+        \item \texttt{collect(Collectors.toList())}: The terminal operation \texttt{collect} collects the results from the stream into a collection. The \texttt{Collectors.toList()} collector is a built-in collector that accumulates the stream’s elements into a list, making it easy to work with the resulting data.
+    \end{itemize}
+
+\end{itemize}
+
+
+\subsubsection{Role Class Implementation}
+
+In this subsection, we will discuss the implementation of the \texttt{Role} class. One important observation is that in this class, there is no need to implement the method to get \texttt{PermissionIds} as we did in the \texttt{User} class. This is because, in the context of the \texttt{Role} entity, retrieving permissionIDs is not required. The \texttt{Role} class serves to define roles, and permissions are associated through the \texttt{RolePermission} entity. Therefore, directly fetching permissionIDs does not make sense within the role entity itself. 
+
+Additionally, it is important to note that the RBAC (Role-Based Access Control) SQL logic is not implemented within the entity class. The role-to-permission mapping and the user-to-role associations are handled through the MyBatis mapper XML files, following the standard practice of separating SQL logic from the entity class. The entity class, which extends \texttt{Model} in MyBatis-Plus, is mainly concerned with the basic CRUD operations. More complex queries, such as retrieving permissions associated with roles, are managed within the mapper files where custom SQL can be defined.
+
+
+\begin{lstlisting}[caption=Role Class Implementation, language=java]
+package *.api.entity;
+
+import *;
+
+@EqualsAndHashCode(callSuper = true)
+@Data
+@Accessors(chain = true)
+@TableName("usr_roles")
+public class Role extends BaseModel<Role> {
+
+    private static final long serialVersionUID = 1L;
+
+    @TableId(type = IdType.ASSIGN_UUID)
+    private String id;
+
+    @TableField("name")
+    private String name;
+
+    @TableField("description")
+    private String description;
+
+    @TableField(exist = false)
+    private List<RolePermission> rolePermissions;
+
+    @TableField(exist = false)
+    private List<User> users;
+
+    @TableField(exist = false)
+    private Integer userCount;
+}
+
+\end{lstlisting}
+
+\begin{itemize}
+    \item \textbf{Using \texttt{@Accessors(chain = true)}}: This annotation is used to enable chain-style setters for the fields in the \texttt{Role} class. By using this annotation, we can set values for the fields in a more fluent and readable manner, such as \texttt{role.setName("Admin").setDescription("Administrator role");}. It simplifies the process of setting multiple properties on an object in a single line, enhancing code readability and making it more concise.
+    
+    \item \textbf{Handling Permissions and Users}: Unlike the \texttt{User} class, which directly handles roles and permissions, the \texttt{Role} class only defines the necessary properties for a role, such as \texttt{name}, \texttt{description}, and related entities like \texttt{rolePermissions}. The association between roles and permissions is established in the \texttt{RolePermission} entity, which holds the actual logic for mapping roles to permissions. Similarly, user-role associations are handled through the \texttt{User} entity and respective join tables, rather than being stored or managed within the \texttt{Role} entity itself.
+
+    \item \textbf{Entity and Mapper Separation}: The \texttt{Role} class demonstrates a key principle of MyBatis-Plus, which is the separation of entity logic and SQL logic. While the entity class holds fields and basic CRUD functionality, the more complex querying logic—such as fetching roles along with their permissions—is managed in the mapper XML files. This promotes better organization and makes it easier to maintain complex queries separately from the data model.
+\end{itemize}
+
+
+
+\subsubsection{Permission Class Implementation}
+
+\begin{lstlisting}[caption=Permission Class Implementation, language=java]
+package *.api.entity;
+
+import *;
+
+@EqualsAndHashCode(callSuper = true)
+@Data
+@Accessors(chain = true)
+@TableName(value = "usr_permissions", autoResultMap = true)
+public class Permission extends Model<Permission> {
+
+    private static final long serialVersionUID = 1L;
+
+    @TableId(type = IdType.INPUT)
+    private String id;
+
+    @TableField("name")
+    private String name;
+
+    @TableField("full_name")
+    private String fullName;
+
+    @TableField("description")
+    private String description;
+
+}
+
+\end{lstlisting}
+
+
+\subsubsection{UserRole Class Implementation}
+
+\begin{lstlisting}[caption=UserRole Class Implementation, language=java]
+package *.api.entity;
+
+import *;
+
+@Getter
+@Setter
+@Accessors(chain = true)
+@TableName("usr_user_role")
+public class UserRole extends BaseModel<UserRole> {
+
+    private static final long serialVersionUID = 1L;
+
+    private Integer id;
+
+    @TableField("user_id")
+    private Integer userId;
+
+    @TableField("role_id")
+    private String roleId;
+
+    @TableField(exist = false)
+    private List<User> users;
+
+    @TableField(exist = false)
+    private List<Role> roles;
+
+    @Override
+    public Serializable pkVal() {
+        return this.id;
+    }
+
+}
+
+\end{lstlisting}
+
+\subsubsection{RolePermission Class Implementation}
+
+\begin{lstlisting}[caption=RolePermission Class Implementation, language=java]
+package *.api.entity;
+
+import *;
+
+@EqualsAndHashCode(callSuper = true)
+@Data
+@Accessors(chain = true)
+@TableName(value = "sys_role_permission", autoResultMap = true)
+public class RolePermission extends BaseModel<RolePermission> {
+
+    private static final long serialVersionUID = 1L;
+
+    @TableId(type = IdType.AUTO)
+    private Integer id;
+
+    @TableField("role_id")
+    private String roleId;
+
+    @TableField("permission_id")
+    private String permissionId;
+
+    @TableField(exist = false)
+    private Permission permission;
+
+}
+
+\end{lstlisting}
+
+
+
+
+
+
+
+\section{Designing Mapper Interfaces}
+
+
+In this section, we will discuss the design of the \texttt{UserMapper} interface, and their implements, which plays a key role in accessing and manipulating data related to the \texttt{User} entity. The \texttt{UserMapper} interface extends the base mapper \texttt{XXBaseMapper}, enabling it to inherit common CRUD operations. Additionally, it defines custom methods tailored to the specific needs of the application, such as the \texttt{loadUserPermissionsByNameEn} method, which loads user permissions based on the user's nameEn.
+
+\subsection{Desiging Mapper For User}
+
+Here is the implementation of the \texttt{UserMapper} interface:
+
+\begin{lstlisting}[caption=UserMapper Interface, language=java]
+package *.admin.biz.service.user.mapper;
+
+import *;
+
+
+@Mapper
+public interface UserMapper extends XXBaseMapper<User> {
+
+    User loadUserPermissionsByNameEn(String nameEn);
+
+}
+\end{lstlisting}
+
+The \texttt{UserMapper} interface extends the \texttt{XXBaseMapper} interface, which provides additional functionality specific to the needs of the application, such as managing data scope restrictions.
+
+Below is the implementation of the \texttt{XXBaseMapper} interface:
+
+\begin{lstlisting}[caption=xxBaseMapper Interface, language=java]
+package *.common.data.datascope;
+
+import *;
+
+public interface xxBaseMapper<T> extends BaseMapper<T> {
+ 
+    List<T> selectListByScope(@Param(Constants.WRAPPER) Wrapper<T> queryWrapper, DataScope scope);
+
+    <E extends IPage<T>> E selectPageByScope(E page, @Param(Constants.WRAPPER) Wrapper<T> queryWrapper, DataScope scope);
+
+    Integer selectCountByScope(@Param(Constants.WRAPPER) Wrapper<T> queryWrapper, DataScope scope);
+
+}
+\end{lstlisting}
+
+
+\begin{itemize}
+
+    \item \textbf{Introduction to \texttt{Wrapper}}: 
+    The \texttt{Wrapper} class in MyBatis-Plus is a versatile tool used to build dynamic SQL queries. It allows developers to create SQL statements without writing raw SQL, offering a type-safe way to construct queries. The \texttt{Wrapper} can be used to add conditions, filters, and orderings to queries in a fluent manner. It supports various SQL operations such as \texttt{eq} (equal), \texttt{like} (pattern matching), and \texttt{in} (matching against a set of values), among others. The advantage of using \texttt{Wrapper} is that it simplifies SQL generation and makes it more maintainable by using Java code instead of SQL strings. Additionally, it allows for greater flexibility as queries can be modified dynamically based on different conditions, without the need to hardcode SQL.
+
+\end{itemize}
+
+Finally, we will look at the \texttt{BaseMapper} interface, which provides the basic CRUD functionality for all entities:
+
+\begin{lstlisting}[caption=BaseMapper Interface Source Code, language=java]
+package com.baomidou.mybatisplus.core.mapper;
+
+import *；
+
+public interface BaseMapper<T> extends Mapper<T> {
+    int insert(T entity);
+
+    int deleteById(Serializable id);
+
+    int deleteById(T entity);
+
+    int deleteByMap(@Param("cm") Map<String, Object> columnMap);
+
+    int delete(@Param("ew") Wrapper<T> queryWrapper);
+
+    int deleteBatchIds(@Param("coll") Collection<?> idList);
+
+    int updateById(@Param("et") T entity);
+
+    int update(@Param("et") T entity, @Param("ew") Wrapper<T> updateWrapper);
+
+    T selectById(Serializable id);
+
+    List<T> selectBatchIds(@Param("coll") Collection<? extends Serializable> idList);
+
+    List<T> selectByMap(@Param("cm") Map<String, Object> columnMap);
+
+    default T selectOne(@Param("ew") Wrapper<T> queryWrapper) {
+        List<T> ts = this.selectList(queryWrapper);
+        if (CollectionUtils.isNotEmpty(ts)) {
+            if (ts.size() != 1) {
+                throw ExceptionUtils.mpe("One record is expected, but the query result is multiple records", new Object[0]);
+            } else {
+                return ts.get(0);
+            }
+        } else {
+            return null;
+        }
+    }
+
+    default boolean exists(Wrapper<T> queryWrapper) {
+        Long count = this.selectCount(queryWrapper);
+        return null != count && count > 0L;
+    }
+
+    Long selectCount(@Param("ew") Wrapper<T> queryWrapper);
+
+    List<T> selectList(@Param("ew") Wrapper<T> queryWrapper);
+
+    List<Map<String, Object>> selectMaps(@Param("ew") Wrapper<T> queryWrapper);
+
+    List<Object> selectObjs(@Param("ew") Wrapper<T> queryWrapper);
+
+    <P extends IPage<T>> P selectPage(P page, @Param("ew") Wrapper<T> queryWrapper);
+
+    <P extends IPage<Map<String, Object>>> P selectMapsPage(P page, @Param("ew") Wrapper<T> queryWrapper);
+}
+
+\end{lstlisting}
+
+The \texttt{BaseMapper} interface defines the core CRUD methods, such as \texttt{insert}, \texttt{updateById}, \texttt{selectById}, and \texttt{deleteById}, along with more complex query methods like \texttt{selectOne}, \texttt{selectList}, and \texttt{selectCount}. These methods provide essential functionality for interacting with the database and can be used directly in the service layer or extended in other mapper interfaces.
+
+\subsection{Desiging Mapper For Role}
+
+Here is the implementation of the \texttt{RoleMapper} interface:
+
+\begin{lstlisting}[caption=RoleMapper Interface, language=java]
+package *.biz.service.user.mapper;
+
+
+import *;
+
+@Mapper
+public interface RoleMapper extends MaBaseMapper<Role> {
+
+    List<Role> loadRolePermissions();
+
+}
+
+\end{lstlisting}
+
+\subsection{Mapping Implementation}
+
+Here is the implementation of the \texttt{UserMapper.xml} and \texttt{RoleMapper.xml} with sql:
+
+\begin{lstlisting}[caption=UserMapper Implemation, language=java]
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  ~      Copyright (c) 2018-2025, ma All rights reserved.
+  -->
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="*.biz.service.user.mapper.UserMapper">
+
+    <resultMap id="UserPermissionsResultMap" type="*.admin.api.entity.User">
+        <result column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="name_en" property="nameEn"/>
+        <result column="is_frozen" property="isFrozen"/>
+        <result column="frozen_at" property="frozenAt"/>
+        <result column="status_id" property="statusId"/>
+        <result column="is_deleted" property="isDeleted"/>
+        <result column="create_by" property="createBy"/>
+        <result column="update_by" property="updateBy"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+
+        <collection property="userRoles"
+                ofType="com.tencent.ma.admin.api.entity.UserRole">
+            <result column="user_role_user_id" property="userId"/>
+            <result column="user_role_role_id" property="roleId"/>
+        </collection>
+    </resultMap>
+
+    <select id="loadUserPermissionsByNameEn" resultMap="UserPermissionsResultMap">
+        SELECT `usr_users`.`id`,
+               `usr_users`.`name`,
+               `usr_users`.`name_en`,
+               `usr_users`.`is_frozen`,
+               `usr_users`.`frozen_at`,
+               `usr_users`.`status_id`,
+               `usr_users`.`is_deleted`,
+               `usr_users`.`create_by`,
+               `usr_users`.`update_by`,
+               `usr_users`.`create_time`,
+               `usr_users`.`update_time`,
+
+               `usr_user_role`.`user_id` AS `user_role_user_id`,
+               `usr_user_role`.`role_id` AS `user_role_role_id`
+        FROM `usr_users`
+                 LEFT JOIN `usr_user_role`
+                           ON `usr_users`.`id` = `usr_user_role`.`user_id`
+                               AND `usr_user_role`.`is_deleted` = 0
+        WHERE `usr_users`.`is_frozen` = 0
+          AND `usr_users`.`is_deleted` = 0
+          AND `usr_users`.`name_en` = #{nameEn}
+    </select>
+
+</mapper>
+
+\end{lstlisting}
+
+
+\begin{lstlisting}[caption=RoleMapper Implemation, language=java]
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="*.biz.service.user.mapper.RoleMapper">
+
+    <resultMap id="RolePermissionsResultMap" type="*.api.entity.Role">
+        <result column="id" property="id"/>
+        <result column="name" property="name"/>
+
+        <collection property="rolePermissions"
+                ofType="*.api.entity.RolePermission">
+            <result column="role_id" property="roleId"/>
+            <result column="permission_id" property="permissionId"/>
+
+            <association property="permission"
+                    javaType="*.api.entity.Permission">
+                <result column="usr_permissions_id" property="id"/>
+            </association>
+        </collection>
+    </resultMap>
+
+    <select id="loadRolePermissions" resultMap="RolePermissionsResultMap">
+        SELECT `usr_roles`.`id`,
+               `usr_roles`.`name`,
+
+               `usr_role_permission`.`role_id`,
+               `usr_role_permission`.`permission_id`,
+
+               `usr_permissions`.`id`         AS `usr_permissions_id`
+        FROM `usr_roles`
+                 LEFT JOIN `usr_role_permission`
+                           ON `usr_roles`.`id` = `usr_role_permission`.`role_id`
+                               AND `usr_role_permission`.`is_deleted` = 0
+                 LEFT JOIN `usr_permissions`
+                           ON `usr_permissions`.`id` = `usr_role_permission`.`permission_id`
+                               AND `usr_permissions`.`is_deleted` = 0
+        WHERE `usr_roles`.`is_deleted` = 0
+    </select>
+
+</mapper>
+
+\end{lstlisting}
+    
+\subsection{Mapping Logic}
+
+    This subsection demonstrates the mapping relationships from users to roles and permissions as implemented above.
+        \begin{table}[H]
+		\centering
+		\caption{UserRole Mapping.}
+		\label{tab:table}
+		\begin{tabular}{ccc}
+			\toprule
+			\textbf{MappingId} & \textbf{UserId} & \textbf{RoleId}\\
+			\midrule
+			1 & 10001 & role1\\
+			2 & 10001 & role2\\
+                3 & 10002 & role2\\
+			\bottomrule
+		\end{tabular}
+			
+            \tabletext{Note: I'm just a logic table, not db table.}
+			
+	\end{table}
+
+        \begin{table}[H]
+		\centering
+		\caption{RolePermission Mapping.}
+		\label{tab:table}
+		\begin{tabular}{ccc}
+			\toprule
+			\textbf{MappingId} & \textbf{RoleId} & \textbf{PermissionId}\\
+			\midrule
+			1 & role1 & permission1\\
+			2 & role2 & permission2\\
+                3 & role2 & permission3\\
+                4 & role1 & permission3\\
+			\bottomrule
+		\end{tabular}
+			
+            \tabletext{Note: I'm just a logic table, not db table.}
+			
+	\end{table}
+
+        
+        \begin{table}[H]
+		\centering
+		\caption{User Mapping.}
+		\label{tab:table}
+		\begin{tabular}{ccc}
+			\toprule
+			\textbf{UserId} & \textbf{RoleId} & \textbf{PermissionId}\\
+			\midrule
+			10001 & role1, role2 & permission1, permission3\\
+			10002 & role2 & permission2, permission3\\
+			\bottomrule
+		\end{tabular}
+			
+            \tabletext{Note: I'm just a logic table, not db table.}
+			
+	\end{table}
+
+        
+
+
+\section{Repository Layer}
+
+In this section, we will discuss the Repository Layer, which is responsible for abstracting database interactions and providing a clean interface for querying and manipulating data. The Repository Layer acts as an intermediary between the service layer and the persistence layer, allowing for more modular, maintainable, and testable code. We will break down the design into three main sections:
+
+\subsection{UserRepository RoleRepository And Their Implementations}
+
+The UserRepository and RoleRepository in this case are essentially an extra abstraction of entities and their mappers. They actually use the methods on their respective mappers.
+
+\begin{lstlisting}[caption=UserRepository Interface, language=java]
+package *.admin.biz.service.user.repository;
+
+import com.baomidou.mybatisplus.extension.service.IService;
+import *.ma.admin.api.entity.User;
+
+public interface UserRepository extends IService<User> {
+
+    User loadUserPermissionsByNameEn(String nameEn);
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption=UserRepositoryImpl, language=java]
+package *.admin.biz.service.user.repository.impl;
+
+import *;
+
+@Repository
+@AllArgsConstructor
+public class UserRepositoryImpl extends ServiceImpl<UserMapper, User> implements UserRepository {
+
+    @Override
+    public User loadUserPermissionsByNameEn(String username) {
+        return getBaseMapper().loadUserPermissionsByNameEn(username);
+    }
+
+}
+\end{lstlisting}
+
+
+\begin{itemize}
+    \item \texttt{@Repository}: 
+    This annotation is part of the Spring Framework and is used to indicate that the class is a Data Access Object (DAO) in the persistence layer. It serves to encapsulate the logic of interacting with the database. Additionally, it marks the class as a Spring Bean, making it available for dependency injection into other components of the application. It also enables exception translation, meaning database-related exceptions are converted into Spring's \texttt{DataAccessException} hierarchy.
+
+    \item \texttt{@AllArgsConstructor}: 
+    This annotation is provided by Lombok, and it automatically generates a constructor with parameters for all fields in the class. This reduces the need for boilerplate code, making the class more concise and easier to read. It is particularly useful when the class has dependencies that need to be injected through the constructor.
+\end{itemize}
+
+
+\begin{lstlisting}[caption=RoleRepository Interface, language=java]
+package *.admin.biz.service.user.repository;
+
+import *;
+
+public interface RoleRepository extends IService<Role> {
+
+    List<Role> loadRolePermissions();
+
+}
+\end{lstlisting}
+
+
+\begin{lstlisting}[caption=RoleRepositoryImpl, language=java]
+package *.admin.biz.service.user.repository.impl;
+
+import *;
+
+
+@Repository
+public class RoleRepositoryImpl extends ServiceImpl<RoleMapper, Role> implements RoleRepository {
+
+    @Override
+    public List<Role> loadRolePermissions() {
+        return getBaseMapper().loadRolePermissions();
+    }
+
+}
+\end{lstlisting}
+
+
+
+The \texttt{ServiceImpl} class is a part of the MyBatis-Plus framework, which simplifies the implementation of the service layer in Spring-based applications. It is a generic class that provides common CRUD operations by extending \texttt{ServiceImpl}. Here's a breakdown of its purpose:
+
+\begin{itemize}
+    \item \texttt{ServiceImpl<RoleMapper, Role>} is a generic class that inherits basic CRUD functionality for the \texttt{Role} entity. By extending this class, the \texttt{RoleRepositoryImpl} inherits methods such as \texttt{save()}, \texttt{remove()}, \texttt{update()}, \texttt{getById()}, and others, making it easier to handle database operations without manually writing SQL or defining many methods.
+    
+    \item The class is parameterized with \texttt{RoleMapper} and \texttt{Role}, where \texttt{RoleMapper} is the MyBatis mapper interface for the \texttt{Role} entity, and \texttt{Role} is the entity class itself. This allows \texttt{ServiceImpl} to automatically wire up the necessary mapper methods and handle the corresponding database queries.
+
+    \item The \texttt{RoleRepositoryImpl} class overrides methods from the \texttt{RoleRepository} interface to implement custom logic, such as loading role permissions in the \texttt{loadRolePermissions()} method. This makes the repository extendable while still inheriting the basic CRUD functionalities.
+
+    \item \texttt{ServiceImpl} also integrates with Spring's \texttt{@Repository} annotation to indicate that this class is a Spring-managed bean for data access, enabling dependency injection throughout the application.
+\end{itemize}
+
+
+\section{Service Interfaces and Implementations}
+
+In this section, we will discuss the design and implementation of \texttt{UserService} and \texttt{RoleService}, as well as how to create unit tests to ensure the correctness of these services.
+
+\subsection{UserService and Its Implementations}
+
+The \texttt{UserService} extends another interface, which serves as the \texttt{contract interface}. The most important method within this service is \texttt{loadUserByUsername}, which takes a \texttt{String username} as input and returns a fully populated \texttt{User} entity. This method allows us to retrieve the user's permission IDs and role IDs. In addition, \texttt{UserService} depends on the \texttt{RoleService}, which is responsible for handling the logic of loading roles through its methods.
+
+\begin{lstlisting}[caption=UserService Interface, language=java]
+package *.admin.biz.service.user.service;
+
+import *;
+
+public interface UserService extends xxUserDetailsService {
+
+    User getUserById(Integer userId);
+
+    User getUserByNameEn(String nameEn);
+
+    List<GhostUser> getGhostUsers();
+
+    Boolean addGhostUser(@Valid GhostUserDTO dto);
+
+    Boolean removeGhostUser(String platform, String user);
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption=xxUserDetailsService Interface, language=java]
+package *.common.security.service;
+
+import *;
+
+public interface MaUserDetailsService {
+
+    MaUserDetails loadUserByUsername(String username) throws UsernameNotFoundException;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption=UserServiceImpl, language=java]
+package *.admin.biz.service.user.service.impl;
+
+import *;
+
+@Service
+@RequiredArgsConstructor
+public class UserServiceImpl implements UserService {
+
+    @Resource
+    private UserRepository userRepository;
+    @NonNull
+    private RoleService roleService;
+    @Resource(name = "ghostRedisTemplates")
+    private Map<String, StringRedisTemplate> ghostRedisTemplates;
+
+    @Override
+    public User getUserById(Integer userId) {
+        return userRepository.getOne(Wrappers.<User>lambdaQuery()
+                .eq(User::getId, userId)
+                .last("LIMIT 1"), false);
+    }
+
+    @Override
+    public User getUserByNameEn(String nameEn) {
+        return userRepository.getOne(Wrappers.<User>lambdaQuery()
+                .eq(User::getNameEn, nameEn)
+                .last("LIMIT 1"), false);
+    }
+
+    @Override
+    public List<GhostUser> getGhostUsers() {
+        List<GhostUser> ghostUsers = new ArrayList<>();
+        ghostRedisTemplates.forEach((platform, redisTemplate) -> {
+            Set<String> keys = redisTemplate.keys("ghostlogin:*");
+            if (CollUtil.isEmpty(keys)) {
+                return;
+            }
+            for (String key : keys) {
+                GhostUser user = new GhostUser();
+                user.setPlatform(platform);
+                List<String> tokens = StrUtil.split(key, "ghostlogin:");
+                user.setFromUser(tokens.get(tokens.size() - 1));
+                user.setToUser(redisTemplate.opsForValue().get(key));
+                user.setTtl(redisTemplate.opsForValue().getOperations().getExpire(key));
+                ghostUsers.add(user);
+            }
+        });
+        return ghostUsers;
+    }
+
+    @Override
+    public Boolean addGhostUser(GhostUserDTO dto) {
+        if (ObjUtil.isNull(dto) || !ghostRedisTemplates.containsKey(dto.getPlatform())) {
+            return false;
+        }
+
+        StringRedisTemplate redisTemplate = ghostRedisTemplates.get(dto.getPlatform());
+        String key = String.format("ghostlogin:%s", dto.getFromUser());
+        redisTemplate.opsForValue().set(key, dto.getToUser(), Duration.ofSeconds(dto.getTtl()));
+        return true;
+    }
+
+    @Override
+    public Boolean removeGhostUser(String platform, String user) {
+        if (!ghostRedisTemplates.containsKey(platform)) {
+            return false;
+        }
+
+        StringRedisTemplate redisTemplate = ghostRedisTemplates.get(platform);
+        String key = String.format("ghostlogin:%s", user);
+        return redisTemplate.opsForValue().getOperations().delete(key);
+    }
+
+    @Override
+    public MaUserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        User user = userRepository.loadUserPermissionsByNameEn(username);
+        if (ObjectUtil.isEmpty(user)) {
+            throw new UsernameNotFoundException("UserNotExists");
+        }
+        List<Role> roles = roleService.loadRolePermissionsByRoleIds(
+                user.getUserRoles().stream().map(UserRole::getRoleId).collect(Collectors.toList()));
+        user.setRoles(roles);
+        return user;
+    }
+}
+\end{lstlisting}
+
+
+\begin{itemize}
+    \item \texttt{@Service}: The \texttt{@Service} annotation is part of the Spring Framework and is used to mark a class as a service component in the Spring context. It indicates that this class holds business logic, and Spring will automatically manage it as a Spring Bean.
+    
+    \item \texttt{@RequiredArgsConstructor}: This annotation is from Lombok, which automatically generates a constructor with required arguments (i.e., fields marked as \texttt{final} or annotated with \texttt{@NonNull}). It helps reduce boilerplate code for dependency injection.
+    
+    \item \texttt{@Resource}: The \texttt{@Resource} annotation is used to inject dependencies in Spring. In this case, it injects the \texttt{userRepository} and the \texttt{ghostRedisTemplates}. The \texttt{name} attribute can specify the name of the bean to inject.
+    
+    \item \texttt{@NonNull}: This Lombok annotation is used to indicate that a field is required and should not be null. If \texttt{roleService} is null, Spring will throw a \texttt{NullPointerException} during dependency injection.
+    
+    \item \texttt{@Valid}: This annotation is used to indicate that the input parameter (in this case, \texttt{GhostUserDTO}) should be validated according to the constraints defined within the \texttt{GhostUserDTO} class. If the validation fails, an exception will be thrown.
+\end{itemize}
+
+
+The \texttt{ServiceImpl} class is a part of the MyBatis-Plus framework, which simplifies the implementation of the service layer in Spring-based applications. It is a generic class that provides common CRUD operations by extending \texttt{ServiceImpl}. Here's a breakdown of its purpose:
+
+\begin{itemize}
+    \item \texttt{ServiceImpl<RoleMapper, Role>} is a generic class that inherits basic CRUD functionality for the \texttt{Role} entity. By extending this class, the \texttt{RoleRepositoryImpl} inherits methods such as \texttt{save()}, \texttt{remove()}, \texttt{update()}, \texttt{getById()}, and others, making it easier to handle database operations without manually writing SQL or defining many methods.
+    
+    \item The class is parameterized with \texttt{RoleMapper} and \texttt{Role}, where \texttt{RoleMapper} is the MyBatis mapper interface for the \texttt{Role} entity, and \texttt{Role} is the entity class itself. This allows \texttt{ServiceImpl} to automatically wire up the necessary mapper methods and handle the corresponding database queries.
+
+    \item The \texttt{RoleRepositoryImpl} class overrides methods from the \texttt{RoleRepository} interface to implement custom logic, such as loading role permissions in the \texttt{loadRolePermissions()} method. This makes the repository extendable while still inheriting the basic CRUD functionalities.
+
+    \item \texttt{ServiceImpl} also integrates with Spring's \texttt{@Repository} annotation to indicate that this class is a Spring-managed bean for data access, enabling dependency injection throughout the application.
+\end{itemize}
+
+
+
+
+
+
+
+\subsection{RoleService and Its Implementations}
+
+
+\begin{lstlisting}[caption=RoleService Interface, language=java]
+package *.admin.biz.service.user.service;
+
+import *;
+
+public interface RoleService {
+
+    List<Role> loadRolePermissionsByRoleIds(List<String> roleIds);
+
+    Map<String, Role> loadRolePermissions(boolean isCheckDirtyData);
+
+}
+
+\end{lstlisting}
+
+
+\begin{lstlisting}[caption=RoleServiceImpl, language=java]
+package *.admin.biz.service.user.service.impl;
+
+import *;
+
+@Slf4j
+@Service
+@Validated
+@RequiredArgsConstructor
+public class RoleServiceImpl implements RoleService {
+
+    @NonNull
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @NonNull
+    private RoleRepository roleRepository;
+
+    @Override
+    public List<Role> loadRolePermissionsByRoleIds(List<String> roleIds) {
+        if (CollUtil.isEmpty(roleIds)) {
+            return new ArrayList<>();
+        }
+
+        List<Role> roles = redisTemplate.<String, Role>opsForHash().multiGet(CacheConstant.UPMS_ROLES, roleIds);
+        roles.removeAll(Collections.singleton(null));
+
+        if (CollUtil.isEmpty(roles)) {
+            Map<String, Role> roleMap = this.loadRolePermissions(false);
+            List<Role> result = new ArrayList<>();
+            roleIds.forEach(roleId -> {
+                if (roleMap.containsKey(roleId)) {
+                    result.add(roleMap.get(roleId));
+                } else {
+                    log.error("CanNotFindRoleKEY:{}", roleId);
+                }
+            });
+            return result;
+        }
+
+        return roles;
+    }
+
+    @Override
+    public synchronized Map<String, Role> loadRolePermissions(boolean isCheckDirtyData) {
+        Map<String, Role> roleMap = roleRepository.loadRolePermissions().stream()
+                .collect(Collectors.toMap(Role::getId, role -> {
+                    Iterator<RolePermission> iterator = role.getRolePermissions().iterator();
+                    while (iterator.hasNext()) {
+                        RolePermission rolePermission = iterator.next();
+                        if (StrUtil.isBlank(rolePermission.getPermission().getId())) {
+                            iterator.remove();
+                        }
+                        rolePermission.setPermission(null);
+                    }
+
+                    return role;
+                }, (k1, k2) -> k1));
+
+        redisTemplate.opsForHash().putAll(CacheConstant.UPMS_ROLES, roleMap);
+
+        if (isCheckDirtyData) {
+            Set<String> keys = redisTemplate.<String, Role>opsForHash().keys(CacheConstant.UPMS_ROLES);
+
+            if (keys.size() != roleMap.size()) {
+                List<String> dirtyKeys = new ArrayList<>();
+                keys.forEach(key -> {
+                    if (!roleMap.containsKey(key)) {
+                        dirtyKeys.add(key);
+                    }
+                });
+                if (CollUtil.isNotEmpty(dirtyKeys)) {
+                    redisTemplate.opsForHash().delete(CacheConstant.UPMS_ROLES, dirtyKeys.toArray());
+                }
+            }
+        }
+
+        return roleMap;
+    }
+}
+
+\end{lstlisting}
+
+
+\subsection{UserServiceTest}
+
+In this section, we will discuss how to use Spring Boot Test to write unit tests for the \texttt{UserService} methods. These tests help verify the correctness of our service layer, ensuring that the business logic behaves as expected under different scenarios.
+
+\begin{lstlisting}[caption=UserServiceTest with SpringBootTest, language=java]
+package *.admin.biz.service.user.service;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import static org.junit.jupiter.api.Assertions.*;
+
+@Slf4j
+@SpringBootTest
+class UserServiceTest {
+
+    @Autowired
+    private UserService userService;
+
+    /**
+     * Test: Verify that if a user doesn't exist, a UsernameNotFoundException is thrown.
+     */
+    @Test
+    public void loadUserByUsername\_WhenUserNotExists\_ShouldThrowException() {
+        // Given
+        String username = "abc";
+
+        // When & Then
+        assertThrows(UsernameNotFoundException.class, () -> userService.loadUserByUsername(username),
+                "Should throw UsernameNotFoundException when user does not exist");
+    }
+
+    /**
+     * Test: Verify that if a user exists with roles and permissions, the correct permission IDs are returned.
+     */
+    @Test
+    public void loadUserByUsername\_WhenUserExistsRoleExistsPermissionExists\_ShouldReturnPermissionIds() {
+        // Given
+        String username = "name1";
+        List<String> permissionIds = Arrays.asList("permission1", "permission2", "permission3", "permission4");
+
+        // When
+        MaUserDetails user = userService.loadUserByUsername(username);
+
+        // Then
+        assertEquals(permissionIds, user.getPermissionIds(),
+                "User should have the expected permissionIds associated with their roles.");
+    }
+
+    /**
+     * Test: Verify that loading a user by username correctly populates their roles and permissions.
+     */
+    @Test
+    public void loadUserByUsername\_WhenUserExists\_ShouldReturnUserWithRolesAndPermissions() {
+        // Given
+        String username = "name1";
+        List<String> expectedRoles = Arrays.asList("role1", "role2");
+        List<String> expectedPermissions = Arrays.asList("permission1", "permission2");
+
+        // When
+        MaUserDetails user = userService.loadUserByUsername(username);
+
+        // Then
+        assertNotNull(user, "User should not be null");
+        assertTrue(user.getRoles().containsAll(expectedRoles),
+                "User should have the expected roles");
+        assertTrue(user.getPermissionIds().containsAll(expectedPermissions),
+                "User should have the expected permissions");
+    }
+
+    /**
+     * Test: Verify that an invalid username returns a user not found exception.
+     */
+    @Test
+    public void loadUserByUsername\_WhenInvalidUsername\_ShouldThrowException() {
+        // Given
+        String invalidUsername = "invalidUser";
+
+        // When & Then
+        assertThrows(UsernameNotFoundException.class, () -> userService.loadUserByUsername(invalidUsername),
+                "Should throw UsernameNotFoundException when the username is invalid");
+    }
+}
+\end{lstlisting}
+
+
+
+
+\end{document}
